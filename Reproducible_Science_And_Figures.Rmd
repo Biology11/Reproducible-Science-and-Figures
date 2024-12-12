@@ -1,0 +1,223 @@
+---
+title: "Reproducible Science and Figures"
+output: pdf_document
+date: "2024-12-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## QUESTION 01: Data Visualisation for Science Communication
+
+*Create a figure using the Palmer Penguin dataset that is correct but badly communicates the data.*
+
+### a) Provide your figure here:
+
+```{r bad figure code, echo=FALSE, message = FALSE, warning = FALSE}
+library(palmerpenguins)
+library(here)
+library(ggplot2)
+library(tidyverse)
+library(janitor)
+here()
+
+set.seed(42)
+random_colours_1 <- sample(c("red", "blue", "green"), nrow(penguins_raw), replace = TRUE)
+
+ggplot(data = penguins_raw, aes(x = `Culmen Length (mm)`, y = `Culmen Depth (mm)`)) +
+  geom_point(aes(color = random_colours_1), size = 3, alpha = 0.8) +
+  labs(
+    title = "Scatter Plot of Penguin Bill Measurements (Raw Data)",
+    x = "Bill Length",
+    y = "Bill Depth"
+  ) +
+  theme_minimal()
+```
+
+### b) Write about how your design choices mislead the reader about the underlying data (200-300 words).
+
+Although there is an underlying trend towards making science more accessible to more groups of people, including supporting open access journals and improving figure understandability (McKiernan et al. 2016), there are still several examples of bad figures across many journals (Baker 2016). The above figure aims to capture some of the elements which make figures confusing, portraying the data poorly.
+
+The graph plots bill depth against bill length for three species of penguin: Adelie, Gentoo, and Chinstrap. In order to mislead the reader about important information in my plot, I chose to remove any indicator of the species tied to each point. Although the plot is correct and in theory biologically relevant in terms of the x and y axes, it is no longer useful for conducting comparisons between species. Moreover, no intraspecific patterns can be determined as we cannot parse species. In order to add further confusion to my plot, I decided to remove the units from both the bill depth and the bill length (Franzblau et al. 2012). This would force any inferred conclusions to be made in arbitrary values, contributing to the misleading of the reader about the underlying data. Finally, to mislead the reader even further I chose to randomly allocate each point one of three different colours. Moreover, the difficulty in reading the value of every point due to overlap would make difficult for others to reach the same conclusions from statistical tests.
+
+Overall, my plot demonstrates the extreme flaws alluded to in research papers aiming to shed light on the bad practices which make science hard to interpret.
+
+------------------------------------------------------------------------
+
+## QUESTION 2: Data Pipeline
+
+*Write a data analysis pipeline in your .rmd RMarkdown file. You should be aiming to write a clear explanation of the steps, the figures visible, as well as clear code.*
+
+### Introduction
+
+I am investigating whether there is a difference between male and female flipper length in Adelie penguins. This is an important analysis as understanding differences in flipper length could suggest slightly differing foraging behaviours in males and females. This would In order to do this, I must first load the necessary packages:
+
+
+```{r Data Exploration}
+# loading in the necessary packages
+library(palmerpenguins)
+library(here)
+library(ggplot2)
+library(tidyverse)
+library(janitor)
+here()
+```
+
+```{r}
+# loading the data to a variable named 'data'
+data <- penguins_raw
+
+# cleaning the data in an appropriate manner
+penguins_clean <- data %>% 
+  select(-starts_with("Delta")) %>% 
+  clean_names(case = "snake")
+colnames(penguins_clean)
+
+adelie_penguins <- subset(penguins_clean, species == "Adelie Penguin (Pygoscelis adeliae)" & !is.na(sex) & !is.na(flipper_length_mm))
+adelie_penguins$sex <- tolower(adelie_penguins$sex)
+```
+
+
+### Hypothesis
+
+I predict that there is a significant difference between the flipper lengths of male and female Adelie penguins.
+
+The null hypotheses (H0) is that 'there is no significant difference between the flipper lengths of male and female Adelie penguins, whilst the alternative hypothesis is that there is a significant difference in the flipper lengths of male and female Adelie penguins.
+
+
+```{r}
+# plotting an overlaid histogram for male and female flipper lengths
+ggplot(data = adelie_penguins, aes(x = flipper_length_mm, fill = sex)) +
+  geom_histogram(alpha = 0.5, position = "identity", binwidth = 3.5) +
+  labs(
+    title = "Flipper Length Distribution of Adelie Penguins",
+    x = "Flipper Length (mm)",
+    y = "Count",
+    fill = "Sex"
+  ) +
+  scale_fill_manual(values = c("male" = "blue", "female" = "orange")) +
+  theme_minimal()
+```
+
+
+At first glance, then, we observe that there is significant overlap in the distributions of flipper length in male and female Adelie penguins. However, there could be a slight difference, with females having a lower median value than the males.
+
+In order to accept or reject the null hypothesis, and determine whether there is a significant difference between male and female Adelie penguin flipper length, we must carry out a statistical analysis.
+
+### Statistical Methods
+
+Firstly, the means of the female and male flipper lengths will be determined.
+
+
+```{r Statistics}
+# grouping the flipper lengths by sex
+flipper_length_mean <- adelie_penguins %>%
+  filter(species == "Adelie Penguin (Pygoscelis adeliae)", !is.na(sex)) %>% 
+  group_by(sex) %>%
+  summarize(mean_flipper_length = mean(flipper_length_mm, na.rm = TRUE))
+flipper_length_mean
+
+# to store them each as a variable
+male_flipper <- adelie_penguins$flipper_length_mm[adelie_penguins$sex == "male"]
+female_flipper <- adelie_penguins$flipper_length_mm[adelie_penguins$sex == "female"]
+female_flipper_mean <- mean(female_flipper)
+male_flipper_mean <- mean(male_flipper)
+```
+
+
+There is a difference in the mean value for the flipper length of male and female Adelie penguins. We will use a two-sample t-test to investigate whether the difference is significant.
+
+
+```{r}
+# carrying out the t-test
+t_test_result <- t.test(
+  male_flipper,
+  female_flipper,
+  alternative = "two.sided",
+  var.equal = TRUE
+)
+# showing the results...
+t_test_result
+```
+
+
+The t-value measures the number of standard errors there are between the difference between the sample means and the null hypothesis. Here, a higher t-value indicates stronger evidence against the null hypothesis. Furthermore, the very small P-value (0.0000109) acts as strong evidence against the null hypothesis. Since the P-value is less than 0.05, we reject the null hypothesis. Finally, the t-test also outputs the mean flipper length of male and female Adelie penguins.
+
+### Results & Discussion
+
+
+```{r Plotting Results}
+# plotting the same histogram with the results of the t-test overlaid
+ggplot(data = adelie_penguins, aes(x = flipper_length_mm, fill = sex)) +
+  geom_histogram(alpha = 0.5, position = "identity", binwidth = 3.5) +
+  labs(
+    title = "Flipper Length Distribution of Adelie Penguins",
+    x = "Flipper Length (mm)",
+    y = "Count",
+    fill = "Sex"
+  ) +
+  scale_fill_manual(values = c("male" = "blue", "female" = "orange")) +
+  theme_minimal() +
+  annotate("text",
+           x = Inf, y = Inf,
+           label = paste(
+             "P-value:", round(t_test_result$p.value, 8),
+             "\nMale Mean:", round(male_flipper_mean, 1),
+             "\nFemale Mean:", round(female_flipper_mean, 1)
+           ),
+           hjust = 1.1, vjust = 1.1, color = "black")
+```
+
+
+This final plot shows the original exploratory flipper length distribution for both male and female Adelie penguins, with the results of the two-sided t-test shown in the top right. Moreover, I added the mean flipper lengths for males and females to demonstrate the difference between them.
+
+This plot could form the beginning of an investigation looking into differences between male and female foraging in the Adelie penguin. Flipper length might modulate important factors like agility and speed, making the results of this analysis relevant to developing our understanding of Adelie penguin ecology.
+
+### Conclusion
+
+In this analysis, I first loaded the data from the correct dataset, which involved recording the metrics of three species of penguin for a prolonged study period. I isolated data for the Adelie penguin species to explore whether there was a difference in the flipper lengths of males and females. I used a histogram to visualise the data before carrying out a two-sample t-test to determine whether the difference was significant. It was found that males had significantly longer flippers than females.
+
+### References
+
+H. Lynch & M. LaRue, First global census of the Adelie Penguin, The Auk, 2014; <https://doi.org/10.1642/AUK-14-31.1>
+
+D. Ainley & D. DeMaster, Survival and Mortality in a Population of Adelie Penguins, Ecology, 1980; <https://doi.org/10.2307/1937418>
+
+------------------------------------------------------------------------
+
+## QUESTION 3: Open Science
+
+### a) GitHub
+
+*GitHub link:* <https://github.com/Biology11/Reproducible-Science-and-Figures>
+
+### b) Share your repo with a partner, download, and try to run their data pipeline.
+
+*Partner's GitHub link:*<https://github.com/biouser2/Reproducable-Science-Assignment>
+
+### c) Reflect on your experience running their code. (300-500 words)
+
+My partner's code was both easy to understand as well as effectively laid out. The analysis pipeline was structured in such a way that made running it, and reproducing the results, easy and intuitive. The introduction was succinct, and summarised the ensuing pipeline nicely, placing the analysis within the broader context of penguin ecology and evolution. From the beginning, the code is annotated concisely, and in an appropriate manner, such that I am able to understand every line. It is particularly useful that the data was also converted to a .csv file, as this would contribute to making the data more accessible to more people.
+
+The data cleaning code is similarly well structured, with less intuitive lines of code annotated, such that I could understand the whole process. Following cleaning the data is subsetted to include only the columns relevant for the analysis. This removes clutter from the data, and makes it easier to manipulate. Perhaps a function for both the cleaning and subsetting stages would be useful, as this would allow me to reproduce the exact data subsets myself without having to copy code.
+
+One element that was particularly useful was the conversion of the species-specific colours to a vector, since this meant colours could be easily transferred to other figures, thus maintaining consistency throughout, as well as making the results more memorable and understandable. Conversely though, I had difficulty understanding the code for saving the plot, and could not easily correct the line 'dev.off()' when it did not work at first. Although it is important that figures are saved in such a way that would allow them to be accessed openly, annotations of the required packages, as well as of the relevant lines of code could be useful for the future.
+
+During the analysis portion of the code, I was able to effectively understand every step through the combination of code comments and subsequent explanations. This allowed me to interpret the outputs of the ANOVA model and statistical tests easily. Perhaps, the elements of the Tukey HSD test could have been explained in more detail, but overall, the analysis was easily reproducible and understood.
+
+Another very effective and understandable element of my partner's pipeline was the final plot which clearly demonstrated the significance of all pairwise comparisons. The asterisks were easily understood as they maintain consistency with model outputs. Furthermore, the use of error bars allowed me to visually understand this significance.
+
+It would be very easy to alter my partner's code to adjust figures as I needed, since every less intuitive line is well annotated. Furthermore, the steps and prerequisites to producing all the plots were well structured, and signposting for all relevant elements was clear. In the future, clear annotations could be added to the code which generated the pairwise comparison data frame, as I could not easily make sense of the function of the different lines involved, and would find it difficult to adjust the output as I needed.
+
+Overall, my partner's code is very clear and highly reproducible. The analysis pipeline was well structured and largely well annotated and the accompanying text effectively supported my understanding of the analysis. A small suggestion would be to include annotations for more difficult portions of code, although the code was mostly understandable.
+
+### d) Reflect on your own code based on your experience with your partner's code and their review of yours. (300-500 words)
+
+The feedback I obtained from my partner regarding my code was useful, constructive, and made sense in terms of increasing reproducibility and understandability. Overall the feedback was positive, especially in relation to the layout of the analysis pipeline and the clarity of the figures. However, there were some useful suggestions which would have greatly improved my work.
+
+First, it was suggested that I should have saved my data as a .csv file as this would have increased the accessibility of my data as well as facilitated future analyses, done by me or other people. I agree with this, as open science requires accessibility to the data of other researchers. Second, my partner explained that it would have been clearer to include the partitioning of my dataset into Adelie penguins and sexes within the cleaning stage, as this would be more intuitive. To an extent I agree with this, because organising my data like this would make it cleaner, although it technically is not part of the cleaning stage, which is why I did not structure my pipeline like that. Third, my partner suggested that I could have been more thorough with my annotations for less intuitive pieces of code. In particular, the 'annotate("text"...) portion for the last plot could have been annotated, as this is perhaps less intuitive than the other parts of the plot code. I agree with this, as open science, and indeed reproducibility, can only be fostered through other people understanding what you have done with your data, whether in terms of the scientific method, or within the programming portion of the analysis. Fourth, it was suggested that I could have incorporated visual elements in my last plot to show the outcome of the statistical tests more simply. This could have been in the form of asterisks to show significance, or indeed simply showing error bars between the two means on my histogram. Although I had focused on making my plots visually accessible through the use of complementary colours, this would have enhanced the understandability further. Finally, my partner suggested that I use a colour vector for showing male and female flipper lengths instead of inputting these manually, as this is a known technique for increasing reproducibility. It would have made the code cleaner to have a colour vector which I used repeatedly, since it would have reduced clutter and made my plots more consistent with each other.
+
+Whilst writing down code for oneself is easy and requires little effort since it is easy to keep track of the changes one makes, writing code for others to use, requires more effort and clarity around decisions made and code used. Furthermore, open science means your code should be easy to use for people with a range of experience with R, and this requires annotations of even the most apparently simple lines of code. Throughout this project I learnt the value of annotating my code, not only for other, but also for myself. It allowed me to more easily keep track of changes I was making as well as critically assess the function of every line in my code. Moreover, clearly explaining the output of statistical tests as well as patterns in exploratory figures made me more aware of the data I was using, increasing my own understanding and familiarity with the decisions I made for my analysis. Finally, making my code understandable to others also forced me to be more concise, constantly questioning ways in which I could simplify each step. This is a crucial skill as it will increase my ability to debug future work.
+
+Overall, writing code for others, and understanding their constructive feedback, has developed my coding skills as well as increased my understanding of the importance of open science. Furthermore, I have begun to develop the necessary skills for making my code and analysis reproducible and understandable for others, regardless of their experience with the code, the analytical methods used, and the subject of analysis.
